@@ -1,12 +1,12 @@
 package yunion
 
 import (
-	"github.com/hashicorp/terraform/helper/schema"
-
 	"bytes"
 	"fmt"
 
 	"github.com/hashicorp/terraform/helper/hashcode"
+	"github.com/hashicorp/terraform/helper/schema"
+
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/onecloud/pkg/mcclient/modules"
 )

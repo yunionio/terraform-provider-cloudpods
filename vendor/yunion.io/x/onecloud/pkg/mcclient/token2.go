@@ -1,3 +1,17 @@
+// Copyright 2019 Yunion
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package mcclient
 
 import (
@@ -5,6 +19,11 @@ import (
 	"math/rand"
 	"strings"
 	"time"
+
+	"yunion.io/x/jsonutils"
+
+	api "yunion.io/x/onecloud/pkg/apis/identity"
+	"yunion.io/x/onecloud/pkg/util/rbacutils"
 )
 
 type KeystoneEndpointV2 struct {
@@ -37,6 +56,10 @@ type KeystoneTenantV2 struct {
 	Name        string
 	Enabled     bool
 	Description string
+	Domain      struct {
+		Id   string
+		Name string
+	}
 }
 
 type KeystoneTokenV2 struct {
@@ -56,7 +79,9 @@ type TokenCredentialV2 struct {
 	Token          KeystoneTokenV2
 	ServiceCatalog KeystoneServiceCatalogV2
 	User           KeystoneUserV2
+	Tenants        []KeystoneTenantV2
 	Metadata       KeystoneMetadataV2
+	Context        SAuthContext
 }
 
 func (token *TokenCredentialV2) GetTokenString() string {
@@ -64,11 +89,11 @@ func (token *TokenCredentialV2) GetTokenString() string {
 }
 
 func (token *TokenCredentialV2) GetDomainId() string {
-	return "default"
+	return api.DEFAULT_DOMAIN_ID
 }
 
 func (token *TokenCredentialV2) GetDomainName() string {
-	return "Default"
+	return api.DEFAULT_DOMAIN_NAME
 }
 
 func (token *TokenCredentialV2) GetTenantId() string {
@@ -85,6 +110,14 @@ func (token *TokenCredentialV2) GetProjectId() string {
 
 func (token *TokenCredentialV2) GetProjectName() string {
 	return token.GetTenantName()
+}
+
+func (token *TokenCredentialV2) GetProjectDomainId() string {
+	return api.DEFAULT_DOMAIN_ID
+}
+
+func (token *TokenCredentialV2) GetProjectDomain() string {
+	return api.DEFAULT_DOMAIN_NAME
 }
 
 func (token *TokenCredentialV2) GetUserName() string {
@@ -128,8 +161,20 @@ func (this *TokenCredentialV2) GetRegions() []string {
 	return this.ServiceCatalog.getRegions()
 }
 
-func (this *TokenCredentialV2) IsSystemAdmin() bool {
+func (this *TokenCredentialV2) HasSystemAdminPrivilege() bool {
 	return this.IsAdmin() && this.GetTenantName() == "system"
+}
+
+func (this *TokenCredentialV2) IsAllow(scope rbacutils.TRbacScope, service string, resource string, action string, extra ...string) bool {
+	if scope == rbacutils.ScopeSystem || scope == rbacutils.ScopeDomain {
+		return this.HasSystemAdminPrivilege()
+	} else {
+		return true
+	}
+}
+
+func (this *TokenCredentialV2) Len() int {
+	return this.ServiceCatalog.Len()
 }
 
 func (this *TokenCredentialV2) GetServiceURL(service, region, zone, endpointType string) (string, error) {
@@ -138,6 +183,10 @@ func (this *TokenCredentialV2) GetServiceURL(service, region, zone, endpointType
 
 func (this *TokenCredentialV2) GetServiceURLs(service, region, zone, endpointType string) ([]string, error) {
 	return this.ServiceCatalog.GetServiceURLs(service, region, zone, endpointType)
+}
+
+func (this *TokenCredentialV2) GetServicesByInterface(region string, infType string) []ExternalService {
+	return nil
 }
 
 func (this *TokenCredentialV2) GetInternalServices(region string) []string {
@@ -154,6 +203,14 @@ func (this *TokenCredentialV2) GetEndpoints(region string, endpointType string) 
 
 func (this *TokenCredentialV2) GetServiceCatalog() IServiceCatalog {
 	return this.ServiceCatalog
+}
+
+func (this *TokenCredentialV2) GetLoginSource() string {
+	return this.Context.Source
+}
+
+func (this *TokenCredentialV2) GetLoginIp() string {
+	return this.Context.Ip
 }
 
 func stringArrayContains(arr []string, needle string) bool {
@@ -184,14 +241,15 @@ func (catalog KeystoneServiceCatalogV2) getRegions() []string {
 
 func (catalog KeystoneServiceCatalogV2) getServiceEndpoint(service, region, zone string) (KeystoneEndpointV2, error) {
 	var selected KeystoneEndpointV2
+	var findService bool
 	for i := 0; i < len(catalog); i++ {
 		if service == catalog[i].Type {
+			findService = true
+			if len(catalog[i].Endpoints) == 0 {
+				continue
+			}
 			if len(region) == 0 {
-				if len(catalog[i].Endpoints) >= 1 {
-					selected = catalog[i].Endpoints[0]
-				} else {
-					return selected, fmt.Errorf("No default region")
-				}
+				selected = catalog[i].Endpoints[0]
 			} else {
 				regionEps := make([]KeystoneEndpointV2, 0)
 				zoneEps := make([]KeystoneEndpointV2, 0)
@@ -216,7 +274,15 @@ func (catalog KeystoneServiceCatalogV2) getServiceEndpoint(service, region, zone
 			return selected, nil
 		}
 	}
-	return selected, fmt.Errorf("No such service %s", service)
+	if findService {
+		return selected, fmt.Errorf("No default region")
+	} else {
+		return selected, fmt.Errorf("No such service %s", service)
+	}
+}
+
+func (catalog KeystoneServiceCatalogV2) Len() int {
+	return len(catalog)
 }
 
 func (catalog KeystoneServiceCatalogV2) GetServiceURL(service, region, zone, endpointType string) (string, error) {
@@ -235,6 +301,10 @@ func (catalog KeystoneServiceCatalogV2) GetServiceURLs(service, region, zone, en
 	return []string{url}, nil
 }
 
+func (catalog KeystoneServiceCatalogV2) GetServicesByInterface(region string, infType string) []ExternalService {
+	return nil
+}
+
 func (ep KeystoneEndpointV2) getURL(epType string) string {
 	switch epType {
 	case "publicURL":
@@ -246,6 +316,10 @@ func (ep KeystoneEndpointV2) getURL(epType string) string {
 	}
 }
 
+func (self *TokenCredentialV2) GetCatalogData(serviceTypes []string, region string) jsonutils.JSONObject {
+	return jsonutils.Marshal(self.GetServiceCatalog())
+}
+
 func (self *TokenCredentialV2) String() string {
 	token := SimplifyToken(self)
 	return token.String()
@@ -253,4 +327,8 @@ func (self *TokenCredentialV2) String() string {
 
 func (self *TokenCredentialV2) IsZero() bool {
 	return len(self.GetUserId()) == 0 && len(self.GetProjectId()) == 0
+}
+
+func (self *TokenCredentialV2) ToJson() jsonutils.JSONObject {
+	return SimplifyToken(self).ToJson()
 }

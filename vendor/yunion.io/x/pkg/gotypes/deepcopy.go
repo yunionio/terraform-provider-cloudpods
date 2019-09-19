@@ -1,8 +1,26 @@
+// Copyright 2019 Yunion
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package gotypes
 
 import (
 	"reflect"
 )
+
+type IDeepCopy interface {
+	DeepCopy() interface{}
+}
 
 type DeepCopyFlags uintptr
 
@@ -19,6 +37,21 @@ func DeepCopyRv(rv reflect.Value) reflect.Value {
 		return reflect.Value{}
 	}
 	typ := rv.Type()
+
+	// XXX: for copy unexportable filed
+	if rv.CanInterface() {
+		if rvCopyer, ok := rv.Interface().(IDeepCopy); ok {
+			if rv.Kind() == reflect.Ptr && rv.IsNil() {
+				return reflect.New(typ).Elem()
+			}
+			cpRv := rvCopyer.DeepCopy()
+			if cpRv == nil {
+				return reflect.New(typ).Elem()
+			}
+			return reflect.ValueOf(cpRv)
+		}
+	}
+
 	switch kind {
 	case reflect.Ptr:
 		if rv.IsNil() {

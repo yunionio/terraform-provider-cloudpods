@@ -1,6 +1,22 @@
+// Copyright 2019 Yunion
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package jsonutils
 
 import (
+	"reflect"
+
 	"yunion.io/x/pkg/utils"
 )
 
@@ -38,7 +54,34 @@ func (this *JSONArray) Copy() *JSONArray {
 	return arr
 }
 
+func (this *JSONString) DeepCopy() interface{} {
+	return DeepCopy(this)
+}
+
+func (this *JSONInt) DeepCopy() interface{} {
+	return DeepCopy(this)
+}
+
+func (this *JSONFloat) DeepCopy() interface{} {
+	return DeepCopy(this)
+}
+
+func (this *JSONBool) DeepCopy() interface{} {
+	return DeepCopy(this)
+}
+
+func (this *JSONArray) DeepCopy() interface{} {
+	return DeepCopy(this)
+}
+
+func (this *JSONDict) DeepCopy() interface{} {
+	return DeepCopy(this)
+}
+
 func DeepCopy(obj JSONObject) JSONObject {
+	if obj == nil || reflect.ValueOf(obj).IsNil() {
+		return nil
+	}
 	switch v := obj.(type) {
 	case *JSONString:
 		vc := *v

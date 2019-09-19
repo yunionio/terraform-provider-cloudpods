@@ -1,7 +1,22 @@
+// Copyright 2019 Yunion
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package appctx
 
 import (
 	"context"
+	"time"
 
 	"yunion.io/x/pkg/trace"
 )
@@ -23,6 +38,9 @@ const (
 	APP_CONTEXT_KEY_TASK_NOTIFY_URL = AppContextKey("tasknotifyurl")
 	APP_CONTEXT_KEY_OBJECT_ID       = AppContextKey("objectid")
 	APP_CONTEXT_KEY_OBJECT_TYPE     = AppContextKey("objecttype")
+	APP_CONTEXT_KEY_START_TIME      = AppContextKey("starttime")
+
+	APP_CONTEXT_KEY_HOST_ID = AppContextKey("hostid")
 )
 
 func AppContextServiceName(ctx context.Context) string {
@@ -117,6 +135,24 @@ func AppContextObjectID(ctx context.Context) string {
 
 func AppContextObjectType(ctx context.Context) string {
 	val := ctx.Value(APP_CONTEXT_KEY_OBJECT_TYPE)
+	if val != nil {
+		return val.(string)
+	} else {
+		return ""
+	}
+}
+
+func AppContextStartTime(ctx context.Context) time.Time {
+	val := ctx.Value(APP_CONTEXT_KEY_START_TIME)
+	if val != nil {
+		return val.(time.Time)
+	} else {
+		return time.Time{}
+	}
+}
+
+func AppContextHostId(ctx context.Context) string {
+	val := ctx.Value(APP_CONTEXT_KEY_HOST_ID)
 	if val != nil {
 		return val.(string)
 	} else {

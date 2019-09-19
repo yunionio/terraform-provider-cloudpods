@@ -1,6 +1,21 @@
+// Copyright 2019 Yunion
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package httperrors
 
 import (
+	"bytes"
 	"fmt"
 
 	"yunion.io/x/onecloud/pkg/util/httputils"
@@ -11,18 +26,100 @@ func NewJsonClientError(code int, title string, msg string, error httputils.Erro
 	return &err
 }
 
-func errorMessage(msg string, params ...interface{}) (string, httputils.Error) {
+func msgFmtToTmpl(msgFmt string) string {
+	// 将%s %d之类格式化字符串转换成{0}、{1}格式
+	// 注意： 1.不支持复杂类型的转换例如%.2f , %[1]d, % x
+	//       2.原始msgFmt中如果包含{0},{1}形式的字符串同样会引发错误。
+	// 在抛出error msgFmt时应注意避免
+	fmtstr := false
+	lst := []rune(msgFmt)
+	lastIndex := len(lst) - 1
+	temp := bytes.Buffer{}
+	index := 0
+	for i, c := range lst {
+		switch c {
+		case '%':
+			if fmtstr || i == lastIndex {
+				temp.WriteRune(c)
+				fmtstr = false
+			} else {
+				fmtstr = true
+			}
+		case 'v', 'T', 't', 'b', 'c', 'd', 'o', 'q', 'x', 'X', 'U', 'e', 'E', 'f', 'F', 'g', 'G', 's', 'p':
+			if fmtstr {
+				temp.WriteRune('{')
+				temp.WriteString(fmt.Sprintf("%d", index))
+				temp.WriteRune('}')
+				index++
+				fmtstr = false
+			} else {
+				temp.WriteRune(c)
+			}
+
+		default:
+			if fmtstr {
+				temp.WriteRune('%')
+			}
+			temp.WriteRune(c)
+			fmtstr = false
+		}
+	}
+
+	return temp.String()
+}
+
+func MsgTmplToFmt(tmpl string) string {
+	return msgTmplToFmt(tmpl)
+}
+
+func msgTmplToFmt(tmpl string) string {
+	b := &bytes.Buffer{}
+	for i := 0; i < len(tmpl); {
+		r := tmpl[i]
+		if r != '{' {
+			b.WriteByte(r)
+			i++
+			continue
+		}
+
+		j := i + 1
+		for ; j < len(tmpl); j++ {
+			r := tmpl[j]
+			if r < '0' || r > '9' {
+				break
+			}
+		}
+		if j == len(tmpl) {
+			b.WriteString(tmpl[i:])
+			return b.String()
+		}
+		if j > i+1 && tmpl[j] == '}' {
+			b.WriteString("%s")
+			i = j + 1
+		} else {
+			b.WriteString(tmpl[i:j])
+			i = j
+		}
+	}
+	return b.String()
+}
+
+func errorMessage(msgFmt string, params ...interface{}) (string, httputils.Error) {
 	fields := make([]string, len(params))
 	for i, v := range params {
 		fields[i] = fmt.Sprint(v)
 	}
 
-	error := httputils.Error{Id: msg, Fields: fields}
+	err := httputils.Error{
+		Id:     msgFmtToTmpl(msgFmt),
+		Fields: fields,
+	}
+
+	msg := msgFmt
 	if len(params) > 0 {
 		msg = fmt.Sprintf(msg, params...)
 	}
-
-	return msg, error
+	return msg, err
 }
 
 func NewBadGatewayError(msg string, params ...interface{}) *httputils.JSONClientError {
@@ -68,6 +165,10 @@ func NewImageNotFoundError(imageId string) *httputils.JSONClientError {
 func NewResourceNotFoundError(msg string, params ...interface{}) *httputils.JSONClientError {
 	msg, err := errorMessage(msg, params...)
 	return NewJsonClientError(404, "ResourceNotFoundError", msg, err)
+}
+
+func NewResourceNotFoundError2(keyword, id string) *httputils.JSONClientError {
+	return NewResourceNotFoundError("%s %s not found", keyword, id)
 }
 
 func NewSpecNotFoundError(msg string, params ...interface{}) *httputils.JSONClientError {
@@ -170,6 +271,11 @@ func NewDuplicateNameError(resName string, resId string) *httputils.JSONClientEr
 	return NewJsonClientError(409, "DuplicateNameError", msg, err)
 }
 
+func NewDuplicateResourceError(msg string, params ...interface{}) *httputils.JSONClientError {
+	msg, err := errorMessage(msg, params)
+	return NewJsonClientError(409, "DuplicateResourceError", msg, err)
+}
+
 func NewConflictError(msg string, params ...interface{}) *httputils.JSONClientError {
 	msg, err := errorMessage(msg, params...)
 	return NewJsonClientError(409, "ConflictError", msg, err)
@@ -185,6 +291,11 @@ func NewRequireLicenseError(msg string, params ...interface{}) *httputils.JSONCl
 	return NewJsonClientError(402, "RequireLicenseError", msg, err)
 }
 
+func NewTimeoutError(msg string, params ...interface{}) *httputils.JSONClientError {
+	msg, err := errorMessage(msg, params...)
+	return NewJsonClientError(504, "TimeoutError", msg, err)
+}
+
 func NewGeneralError(err error) *httputils.JSONClientError {
 	switch err.(type) {
 	case *httputils.JSONClientError:
@@ -192,4 +303,14 @@ func NewGeneralError(err error) *httputils.JSONClientError {
 	default:
 		return NewInternalServerError(err.Error())
 	}
+}
+
+func NewProtectedResourceError(msg string, params ...interface{}) *httputils.JSONClientError {
+	msg, err := errorMessage(msg, params...)
+	return NewJsonClientError(403, "ProtectedResourceError", msg, err)
+}
+
+func NewNoProjectError(msg string, params ...interface{}) *httputils.JSONClientError {
+	msg, err := errorMessage(msg, params...)
+	return NewJsonClientError(403, "NoProjectError", msg, err)
 }

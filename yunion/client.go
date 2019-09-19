@@ -1,6 +1,8 @@
 package yunion
 
 import (
+	"context"
+
 	"yunion.io/x/log"
 
 	"yunion.io/x/onecloud/pkg/mcclient"
@@ -12,6 +14,7 @@ type SYunionConfig struct {
 	Password          string
 	Domain            string
 	Project           string
+	ProjectDomain     string
 	Region            string
 	EndpointType      string
 	DefaultApiVersion string
@@ -27,8 +30,8 @@ type SYunionClient struct {
 }
 
 func NewYunionClient(conf SYunionConfig) (*SYunionClient, error) {
-	cli := mcclient.NewClient(conf.AuthUrl, conf.Timeout, conf.Debug, conf.Insecure)
-	token, err := cli.Authenticate(conf.Username, conf.Password, conf.Domain, conf.Project)
+	cli := mcclient.NewClient(conf.AuthUrl, conf.Timeout, conf.Debug, conf.Insecure, "", "")
+	token, err := cli.Authenticate(conf.Username, conf.Password, conf.Domain, conf.Project, conf.ProjectDomain)
 	if err != nil {
 		log.Errorf("authenticate fail %s", err)
 		return nil, err
@@ -42,7 +45,7 @@ func NewYunionClient(conf SYunionConfig) (*SYunionClient, error) {
 }
 
 func (cli *SYunionClient) refreshToken() error {
-	token, err := cli.client.Authenticate(cli.conf.Username, cli.conf.Password, cli.conf.Domain, cli.conf.Project)
+	token, err := cli.client.Authenticate(cli.conf.Username, cli.conf.Password, cli.conf.Domain, cli.conf.Project, cli.conf.ProjectDomain)
 	if err != nil {
 		return err
 	}
@@ -60,5 +63,5 @@ func (cli *SYunionClient) getSession(apiVersion string) *mcclient.ClientSession 
 	if len(apiVersion) == 0 {
 		apiVersion = cli.conf.DefaultApiVersion
 	}
-	return cli.client.NewSession(cli.conf.Region, "", cli.conf.EndpointType, cli.token, apiVersion)
+	return cli.client.NewSession(context.Background(), cli.conf.Region, "", cli.conf.EndpointType, cli.token, apiVersion)
 }

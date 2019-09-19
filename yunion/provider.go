@@ -43,6 +43,12 @@ func Provider() terraform.ResourceProvider {
 				DefaultFunc: schema.EnvDefaultFunc("OS_PROJECT_NAME", os.Getenv("OS_PROJECT_NAME")),
 				Description: "project name",
 			},
+			"project_domain": &schema.Schema{
+				Type:        schema.TypeString,
+				Required:    true,
+				DefaultFunc: schema.EnvDefaultFunc("OS_PROJECT_DOMAIN", os.Getenv("OS_PROJECT_DOMAIN")),
+				Description: "project domain name",
+			},
 			"region": &schema.Schema{
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -91,6 +97,10 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 
 	if v, ok := d.GetOk("project"); ok {
 		conf.Project = v.(string)
+	}
+
+	if v, ok := d.GetOk("project_domain"); ok {
+		conf.ProjectDomain = v.(string)
 	}
 
 	if v, ok := d.GetOk("region"); ok {

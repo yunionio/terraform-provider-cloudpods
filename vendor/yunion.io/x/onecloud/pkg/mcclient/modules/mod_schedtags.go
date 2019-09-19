@@ -1,14 +1,30 @@
+// Copyright 2019 Yunion
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package modules
 
 import (
 	"sync"
 
 	"yunion.io/x/jsonutils"
+
 	"yunion.io/x/onecloud/pkg/mcclient"
+	"yunion.io/x/onecloud/pkg/mcclient/modulebase"
 )
 
 type SchedtagManager struct {
-	ResourceManager
+	modulebase.ResourceManager
 }
 
 var (
@@ -40,7 +56,7 @@ func (this *SchedtagManager) DoBatchSchedtagHostAddRemove(s *mcclient.ClientSess
 				_host, _ := host.GetString()
 				_tag, _ := tag.GetString()
 				if action == "remove" {
-					Schedtaghosts.Detach(s, _tag, _host)
+					Schedtaghosts.Detach(s, _tag, _host, nil)
 				} else if action == "add" {
 					Schedtaghosts.Attach(s, _tag, _host, nil)
 				}
@@ -54,7 +70,7 @@ func (this *SchedtagManager) DoBatchSchedtagHostAddRemove(s *mcclient.ClientSess
 
 func init() {
 	Schedtags = SchedtagManager{NewComputeManager("schedtag", "schedtags",
-		[]string{"ID", "Name", "Default_strategy"},
+		[]string{"ID", "Name", "Default_strategy", "Resource_type", "Domain_id", "Project_id"},
 		[]string{})}
 
 	registerCompute(&Schedtags)

@@ -1,14 +1,30 @@
+// Copyright 2019 Yunion
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package modules
 
 import (
 	"fmt"
 
 	"yunion.io/x/jsonutils"
+
 	"yunion.io/x/onecloud/pkg/mcclient"
+	"yunion.io/x/onecloud/pkg/mcclient/modulebase"
 )
 
 type RoleAssignmentManagerV3 struct {
-	ResourceManager
+	modulebase.ResourceManager
 }
 
 type role struct {
@@ -54,7 +70,6 @@ var (
 // get project users for given project
 func (this *RoleAssignmentManagerV3) GetProjectUsers(s *mcclient.ClientSession, id string, params jsonutils.JSONObject) (jsonutils.JSONObject, error) {
 
-	data := jsonutils.NewDict()
 	query := jsonutils.NewDict()
 
 	effective, e := params.GetString("effective")
@@ -126,6 +141,8 @@ func (this *RoleAssignmentManagerV3) GetProjectUsers(s *mcclient.ClientSession, 
 	for _, proj := range projects {
 		projJson.Add(proj.json())
 	}
+
+	data := jsonutils.NewDict()
 	data.Add(projJson, "data")
 	data.Add(jsonutils.NewInt(int64(len(projects))), "total")
 	return data, nil
@@ -201,7 +218,7 @@ func (this *RoleAssignmentManagerV3) GetProjectRole(s *mcclient.ClientSession, i
 
 func init() {
 	RoleAssignments = RoleAssignmentManagerV3{NewIdentityV3Manager("role_assignment", "role_assignments",
-		[]string{"Scope", "User", "Group", "Role"},
+		[]string{"Scope", "User", "Group", "Role", "Policies"},
 		[]string{})}
 	register(&RoleAssignments)
 }

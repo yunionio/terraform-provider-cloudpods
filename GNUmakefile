@@ -3,6 +3,8 @@ GOFMT_FILES?=$$(find . -name '*.go' |grep -v vendor)
 WEBSITE_REPO=github.com/hashicorp/terraform-website
 PKG_NAME=yunion
 
+export GO111MODULE:=on
+
 default: build
 
 build: fmtcheck	all
@@ -89,3 +91,8 @@ linux:
 	GOOS=linux GOARCH=amd64 go build -o bin/terraform-provider-yunion
 	tar czvf bin/terraform-provider-yunion_linux-amd64.tgz bin/terraform-provider-yunion
 	rm -rf bin/terraform-provider-yunion
+
+mod:
+	go get $(patsubst %,%@master,$(shell GO111MODULE=on go mod edit -print  | sed -n -e 's|.*\(yunion.io/x/[a-z].*\) v.*|\1|p'))
+	go mod tidy
+	go mod vendor -v
